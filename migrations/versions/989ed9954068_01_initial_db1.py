@@ -1,8 +1,8 @@
-"""01_initial-db3
+"""01_initial-db1
 
-Revision ID: 8b9f9347f4a2
+Revision ID: 989ed9954068
 Revises: 
-Create Date: 2023-09-05 20:19:46.452077
+Create Date: 2023-09-11 14:58:25.685497
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '8b9f9347f4a2'
+revision: str = '989ed9954068'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -36,6 +36,7 @@ def upgrade() -> None:
     )
     op.create_table('paths',
     sa.Column('id_path', sa.UUID(), nullable=False),
+    sa.Column('unique_id', sa.UUID(), nullable=True),
     sa.Column('path', sa.String(length=100), nullable=True),
     sa.Column('is_downloadable', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
@@ -45,6 +46,7 @@ def upgrade() -> None:
     )
     op.create_table('files',
     sa.Column('id_file', sa.UUID(), nullable=False),
+    sa.Column('unique_id', sa.UUID(), nullable=True),
     sa.Column('file_name', sa.String(length=50), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
     sa.Column('id_path', sa.UUID(), nullable=True),

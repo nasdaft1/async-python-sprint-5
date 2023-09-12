@@ -1,10 +1,12 @@
-import datetime
+from datetime import datetime
 import logging
 from uuid import UUID
+from typing import Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sql
 from fastapi import UploadFile
+from pydantic import BaseModel
 
 from src.db.models import Files, Paths
 from src.db.db import s3
@@ -12,138 +14,120 @@ from src.models.upload import ResponseUpLoad
 from src.services.util import check_path_file, add_id
 
 
+class Data(BaseModel):
+    unique_id: UUID | None = None  # уникальный индекс между путем и файлом
+    file_name: str | None = None
+    path: str
+    id_path: UUID | None = None
+    id_user: UUID | None = None
+    id_file: UUID | None = None
+    file_hash: str | None = None
+    file_size: int | None = None
+    file_uuid: str | None = None
+    file_date: datetime = sql.func.now()
+    storage_file: str | None = None  # имя хранения в облаке
+
+
 class UpLoad:
     session: AsyncSession
 
-    async def save_file_db(self, file_name: str | None,
-                           path: str, file: UploadFile,
-                           id_user: UUID) -> ResponseUpLoad:
+    @staticmethod
+    async def storage_upload(file: UploadFile, file_name: str | None
+                             ) -> Tuple[str, str, datetime]:
         """
-        Запись данных в таблицу БД с файлами
-        :param file_name: имя файла | None имя закачиваемого файла
-        :param path: путь к файлу
-        :param file: файл с данными
-        :param id_user: UUID создавший файлы
+        Запись файла в облачное хранилище
+        и получение size:str, hash:str записанного файла туда
+        :param file: ссылка на файл который будет записываться
+        :param file_name: имя файла как будет называться в хранилище
+        :return: file -> size:str, hash:str, file_modific:datetime
         """
-        name_uuid = ''
-        create_at = ''
-        if file_name is None:
-            file_name = file.filename  # имя скачиваемого
-            logging.debug(f'В path_file не указан file наследуем '
-                          f'от скачиваемого {file_name}')
-        # Находим UUID каталога
-        statement = (
-            sql.select(Paths.id_path).where(
-                sql.and_(
-                    Paths.path == path,
-                    Paths.is_downloadable,
-                    Paths.account_id == id_user
-                )).limit(1))
-        id_path = (await (self.session.execute(statement))).one_or_none()[0]
-        logging.debug(f' file_name:{file_name}, id_file:{id_path}')
-
-        statement = (
-            sql.select(Files.id_path).
-            where(sql.and_(
-                Files.file_name == file_name,
-                Files.id_path == str(id_path),
-                Files.is_downloadable,
-                Files.account_id == id_user
-            )).limit(1))
-        result = (await (self.session.execute(statement))).one_or_none()
-        logging.debug(f' ----------- {result}')
-        if result is None:
-            logging.debug(f'файла {file_name} нет в хранилище {result}')
-
-            obj = Files(id_file=await add_id(session=self.session),
-                        file_name=file_name,
-                        id_path=str(id_path),
-                        hash='',
-                        account_id=str(id_user))
-            self.session.add(obj)
-            await self.session.commit()
-            logging.debug(f'файла {file_name} нет в хранилище, добавлен '
-                          f'uuid={obj.id_file}')
-            name_uuid = str(obj.id_file)
-            create_at = obj.created_at.strftime('%Y-%m-%dT%H:%M:%SZ')
-
-        else:
-            logging.debug(f'файла {file_name} есть в хранилище и будет '
-                          f'переписан uuid={result[0]}')
-            data_time_create = datetime.datetime.now()
-            create_at = data_time_create.strftime('%Y-%m-%dT%H:%M:%SZ')
-            name_uuid = str(result[0])
-            # корректируем дату создания файла
-            statement = (
-                sql.update(Files).
-                where(Files.id_file == name_uuid).
-                values(created_at=data_time_create))
-            await (self.session.execute(statement))
 
         # запись в облако
         file_data = file.file.read()
-        await s3.upload(name_uuid, file_data)
-        files = [f async for f in s3.list(name_uuid)]
-        logging.debug(files[0])
-        # вносим в таблицу HASH, Size
-        statement = (
-            sql.update(Files).
-            where(Files.id_file == name_uuid).
-            values(size=files[0].size, hash=files[0].e_tag).
-            returning(Files.size, Files.hash))
-        res = (await (self.session.execute(statement))).fetchone()
+        await s3.upload(file_name, file_data)
+        data = [f async for f in s3.list(file_name)][0]
+        logging.debug(data)
+        return data.size, data.e_tag, data.last_modified
+
+    async def file_create(self, args: Data) -> None:
+        obj = Files(
+            unique_id=args.unique_id,
+            file_name=args.file_name,
+            id_path=args.id_path,
+            hash=args.file_hash,
+            size=args.file_size,
+            account_id=args.id_user)
+        logging.info(obj)
+        self.session.add(obj)
         await self.session.commit()
 
-        logging.debug(f' Получаем из файла = {name_uuid} хранилища '
-                      f'size={files[0].size} , hash={files[0].e_tag} {res}')
+    async def file_update(self, args: Data) -> None:
+        file_name_update = sql.update(Files).where(
+            Files.id_file == args.id_file).values(
+            file_name=args.file_name,
+            hash=args.file_hash,
+            size=args.file_size)
+        await self.session.execute(file_name_update)
+
+    async def save_file_db(self, file: UploadFile,
+                           args: Data) -> ResponseUpLoad:
+        """ Запись данных в таблицу БД с файлами. """
+        sql_id_file = (sql.select(Files.unique_id).where(sql.and_(
+            Files.file_name == args.file_name,
+            Files.id_path == args.id_path)).limit(1))
+        logging.debug(sql_id_file)
+
+        id_file = (await self.session.execute(sql_id_file)).fetchone()
+        if id_file is None:
+            args.unique_id = await add_id(session=self.session)
+        else:
+            args.unique_id = UUID(str(id_file[0]))
+        # запись в хранилище
+        args.file_size, args.file_hash, args.file_date = await \
+            self.storage_upload(file, str(args.unique_id))
+        if id_file is None:
+            await self.file_create(args)
+        else:
+            args.id_file = id_file[0]
+            await self.file_update(args)
         return (ResponseUpLoad(
-            id=name_uuid,
-            name=file_name,
-            created_ad=create_at,
-            path=path,
-            size=files[0].size,
+            id=args.unique_id,
+            name=args.file_name,
+            created_ad=args.file_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            path=args.path,
+            size=args.file_size,
             is_downloadable=True))
 
-    async def upload(self, path_file: str,
-                     file: UploadFile,
+    async def upload(self, path_file: str, file: UploadFile,
                      id_user: UUID) -> ResponseUpLoad | str:
         """
         Проверка записи о файле в БД Postgres
         Добавляем каталоги в таблицу БД
         """
-        # Разбивка path_file
-
-        file_name, paths = check_path_file(path_file)
-        if paths is None:
-            # неверный формат ввода path_file
-            return 'Error input path'
-        for index in range(len(paths)):
-            path = paths[index]
-            logging.debug(f'Проверяем наличие каталога {path}')
-            # Проверяем наличие каталога
-            statement = (
-                sql.select(Paths.id_path).
-                where(sql.and_(
-                    Paths.path == path,
-                    Paths.is_downloadable,
-                    Paths.account_id == id_user
-                )).limit(1))
-            result = (await (self.session.execute(statement))).one_or_none()
-            if result is None:
-                # Создаем запись в БД с каталогом
-
-                obj = Paths(id_path=await add_id(session=self.session),
-                            path=path,
-                            account_id=id_user)
-                self.session.add(obj)
-                await self.session.commit()
-                logging.debug(f'Добавлена папка={obj.path} в '
-                              f'БД uuid={obj.id_path}')
-            else:
-                logging.debug(f'В БД уже есть папка= {path}')
-                break
+        args = Data
+        args.id_user = id_user
+        args.file_name, args.path = check_path_file(path_file)
+        if args.file_name is None:
+            args.file_name = file.filename  # имя скачиваемого
+            logging.debug(f'В path_file не указан file наследуем '
+                          f'от скачиваемого {args.file_name}')
+        exists_query = (sql.select(Paths.id_path).where(
+            sql.and_(Paths.path == args.path,
+                     Paths.is_downloadable,
+                     Paths.account_id == args.id_user))).limit(1)
+        args.id_path = (await self.session.execute(exists_query)).fetchone()
+        # Проверяем наличие каталога
+        if args.id_path is None:
+            # # Создаем запись в БД с каталогом
+            obj = Paths(id_path=await add_id(session=self.session),
+                        path=args.path, account_id=args.id_user)
+            self.session.add(obj)
+            await self.session.commit()
+            args.id_path = obj.id_path
+            logging.debug(f'Добавлена папка={args.path} ')
+        else:
+            logging.debug(f'В БД уже есть папка= {args.path} ')
+            # приведение в общий формат поиска и добавления
+            args.id_path = str(args.id_path[0])
         # добавляем данные о файле в таблицу БД
-        return await self.save_file_db(
-            file_name=file_name,
-            path=paths[0],
-            file=file, id_user=id_user)
+        return await self.save_file_db(file=file, args=args)

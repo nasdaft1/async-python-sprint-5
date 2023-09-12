@@ -53,7 +53,7 @@ class StorageConfig(BaseSettings):
 
 
 class Crypt(BaseSettings):
-    token_name: str = 'Bearer_token'
+    token_name: str = 'X-Bearer_token'
     secret_key: str
     algorithm: str
     access_token_expire_minutes: int = 30  # минуты

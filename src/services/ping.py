@@ -36,19 +36,19 @@ class Ping:
     session: AsyncSession
 
     @timing_decorator
-    async def time_test_db(self):
+    async def time_test_db(self) -> None:
         """Время доступа к БД"""
         statement = (sql.select(Access.id))
         result = (await (self.session.execute(statement))).scalars()
 
     @timing_decorator
-    async def time_test_s3(self):
+    async def time_test_s3(self) -> None:
         """Время доступа к облачному хранилищу"""
         files = [f async for f in s3.list('test')]
         logging.debug(files)
 
     @timing_decorator
-    async def time_test_nginx(self):
+    async def time_test_nginx(self) -> None:
         """Время доступа к nginx"""
         url = f'http://{config.app_host}:{config.nginx_port}'
         async with aiohttp.ClientSession() as session:

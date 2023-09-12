@@ -28,12 +28,11 @@ class Search:
         if limits < 1:
             limits = None
         statement = (
-            sql.select(Files.id_file.label('id_file').label('file'),
-                       Files.file_name.label('name').label('name'),
-                       Files.created_at.label('created_at').label(
-                           'created_at'),
-                       Paths.path.label('path').label('path'),
-                       Files.size.label('size').label('size'),
+            sql.select(Files.id_file.label('file'),
+                       Files.file_name.label('name'),
+                       Files.created_at.label('created_at'),
+                       Paths.path.label('path'),
+                       Files.size.label('size'),
                        Files.is_downloadable.
                        label('is_downloadable')
                        ).join(Paths).where(

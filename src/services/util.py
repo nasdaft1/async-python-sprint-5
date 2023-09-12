@@ -1,5 +1,6 @@
 import logging
 import uuid
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
@@ -9,53 +10,44 @@ from src.db.models import UniqueUUID
 session: AsyncSession
 
 
-def check_path_file(path_file: str) -> [str | None, dict | None]:
+def check_path_file(path_file: str) -> [str | None, str | None]:
     """
     Проверка и получение путей и файла
     :param path_file: /xx/yy.y
     :return: file:str|None, paths:[]| None
     """
-
     file = path_file[path_file.rfind('/') + 1:]
     path = path_file[:path_file.rfind('/') + 1]
-    paths = []
+
     try:
         match len(file) - file.rfind('.'), file.count('.'):
             case 1, 0:
-                raise ValueError('Не указано название файла')
+                file = None
             case _, 0:
                 raise ValueError('Не может быть названия файла без точки')
             case 1, 1:
                 raise ValueError(
                     'Не может быть название файла закачиваться на .')
+        if path.count('//') == 1 or path[0] != '/':
+            raise ValueError('Не верный путь // or not /')
+        if path.count('.') != 0:
+            raise ValueError('Error путь содержит (.) запрещенный символ')
     except ValueError as error:
-        logging.error(error)
+        path = None
         file = None
-    try:
-        while True:
-            if path.count('//') == 1 or path[0] != '/':
-                raise ValueError('Не верный путь // or not /')
-            path = path[:path.rfind('/')]
-            if path.count('/') == 0:
-                paths.append('/')
-                break
-            paths.append(path)
-    except ValueError as error:
-        paths = None
         logging.error(error)
+    logging.debug(f'file={file} \t paths={path}')
+    return file, path
 
-    logging.debug(f'file={file} \t paths={paths}')
-    return file, paths
 
-
-async def add_id(session: AsyncSession, attempt: int = 1) -> str:
+async def add_id(session: AsyncSession, attempt: int = 1) -> UUID:
     """Для получения уникального ключа"""
     # Создаем запись в БД с каталогом
     index = 0
     while True:
 
-        key = str(uuid.uuid4())
-        obj = UniqueUUID(id=str(key))
+        key = uuid.uuid4()
+        obj = UniqueUUID(id=key)
 
         try:
             session.add(obj)

@@ -6,7 +6,6 @@ import uvicorn
 
 from src.core.config import AppConfig, StorageConfig
 from src.api.v1 import base
-from src.check_db import check_db
 
 config = AppConfig()
 config_s3 = StorageConfig()
@@ -22,7 +21,6 @@ app = FastAPI(
 app.include_router(base.router, prefix="/api/v1")
 
 if __name__ == "__main__":
-    check_db(time_delay_max=20)
     logging.info(f'Starting the server host={config.app_title} '
                  f'port={config.app_port}')
     uvicorn.run(
