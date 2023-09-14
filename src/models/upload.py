@@ -1,4 +1,4 @@
-from src.models.base import Auth, FileConfig
+from models.base import Auth, FileConfig
 from uuid import UUID
 
 
@@ -7,7 +7,7 @@ class RequestUpLoad(Auth):
 
 
 class ResponseUpLoad(FileConfig):
-    id: UUID
+    id: str
     name: str
     created_ad: str
     path: str

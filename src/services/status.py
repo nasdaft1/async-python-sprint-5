@@ -4,14 +4,14 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sql
 
-from src.db.models import Files, Paths
-from src.models.status import ResponseStatus, ResponseStatusFiles
+from db.models import Files, Paths
+from models.status import ResponseStatus, ResponseStatusFiles
 
 
 class Status:
     session: AsyncSession
 
-    async def status(self, id_user: UUID) -> ResponseStatus:
+    async def status(self, id_user: str) -> ResponseStatus:
         """
         Статус файлов
         :param id_user: UUID создавший файлы

@@ -1,13 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.services.register import Register
-from src.services.auth import Auth
-from src.services.ping import Ping
-from src.services.upload import UpLoad
-from src.services.download import Download
-from src.services.filesall import FilesAll
-from src.services.status import Status
-from src.services.search import Search
-from src.services.revisions import Revisions
+from services.register import Register
+from services.auth import Auth
+from services.ping import Ping
+from services.upload import UpLoad
+from services.download import Download
+from services.filesall import FilesAll
+from services.status import Status
+from services.search import Search
+from services.revisions import Revisions
 
 
 class ServiceLink(Register, Auth, Ping,

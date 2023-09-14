@@ -1,12 +1,15 @@
 import logging
+from logging import config as logging_config
 
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 import uvicorn
 
-from src.core.config import AppConfig, StorageConfig
-from src.api.v1 import base
+from core.logger import LOGGING
+from core.config import AppConfig, StorageConfig
+from api.v1 import base
 
+logging_config.dictConfig(LOGGING)
 config = AppConfig()
 config_s3 = StorageConfig()
 

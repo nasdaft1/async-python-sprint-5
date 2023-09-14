@@ -8,18 +8,18 @@ import sqlalchemy as sql
 from fastapi import UploadFile
 from pydantic import BaseModel
 
-from src.db.models import Files, Paths
-from src.db.db import s3
-from src.models.upload import ResponseUpLoad
-from src.services.util import check_path_file, add_id
+from db.models import Files, Paths
+from db.db import s3
+from models.upload import ResponseUpLoad
+from services.util import check_path_file, add_id
 
 
 class Data(BaseModel):
-    unique_id: UUID | None = None  # уникальный индекс между путем и файлом
+    unique_id: str | None = None  # уникальный индекс между путем и файлом
     file_name: str | None = None
     path: str
-    id_path: UUID | None = None
-    id_user: UUID | None = None
+    id_path: str | None = None
+    id_user: str | None = None
     id_file: UUID | None = None
     file_hash: str | None = None
     file_size: int | None = None
@@ -81,15 +81,16 @@ class UpLoad:
         if id_file is None:
             args.unique_id = await add_id(session=self.session)
         else:
-            args.unique_id = UUID(str(id_file[0]))
+            args.unique_id = str(id_file[0])
         # запись в хранилище
         args.file_size, args.file_hash, args.file_date = await \
-            self.storage_upload(file, str(args.unique_id))
+            self.storage_upload(file, args.unique_id)
         if id_file is None:
             await self.file_create(args)
         else:
-            args.id_file = id_file[0]
+            args.id_file = str(id_file[0])
             await self.file_update(args)
+        await self.session.commit()
         return (ResponseUpLoad(
             id=args.unique_id,
             name=args.file_name,
@@ -99,7 +100,7 @@ class UpLoad:
             is_downloadable=True))
 
     async def upload(self, path_file: str, file: UploadFile,
-                     id_user: UUID) -> ResponseUpLoad | str:
+                     id_user: str) -> ResponseUpLoad | str:
         """
         Проверка записи о файле в БД Postgres
         Добавляем каталоги в таблицу БД
@@ -115,19 +116,22 @@ class UpLoad:
             sql.and_(Paths.path == args.path,
                      Paths.is_downloadable,
                      Paths.account_id == args.id_user))).limit(1)
-        args.id_path = (await self.session.execute(exists_query)).fetchone()
+        id_path = (await self.session.execute(exists_query)).fetchone()
         # Проверяем наличие каталога
-        if args.id_path is None:
+        if id_path is None:
             # # Создаем запись в БД с каталогом
-            obj = Paths(id_path=await add_id(session=self.session),
+            unique_id = await (add_id(session=self.session))
+            obj = Paths(unique_id=unique_id,
                         path=args.path, account_id=args.id_user)
+
             self.session.add(obj)
             await self.session.commit()
-            args.id_path = obj.id_path
+            args.id_path = str(obj.id_path)
             logging.debug(f'Добавлена папка={args.path} ')
         else:
-            logging.debug(f'В БД уже есть папка= {args.path} ')
+            args.id_path = str(id_path[0])
+            logging.debug(f'В БД уже есть папка= {args.id_path} ')
             # приведение в общий формат поиска и добавления
-            args.id_path = str(args.id_path[0])
         # добавляем данные о файле в таблицу БД
+
         return await self.save_file_db(file=file, args=args)

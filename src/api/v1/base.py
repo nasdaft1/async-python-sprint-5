@@ -7,18 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import OAuth2PasswordBearer
 from fastapi_users.authentication import CookieTransport
 
-from src.models.auth import username_query, password_query
-from src.models.files import ResponseFiles
-from src.models.ping import ResponsePing
-from src.models.register import ResponseRegister
-from src.models.revisions import ResponseRevisions
-from src.models.search import ResponseSearchAll
-from src.models.status import ResponseStatus
-from src.models.upload import ResponseUpLoad
-from src.db.db import get_session
-from src.services.base import ServiceLink
-import src.services.authorization as auto
-from src.core.config import config_token
+from models.auth import username_query, password_query
+from models.files import ResponseFiles
+from models.ping import ResponsePing
+from models.register import ResponseRegister
+from models.revisions import ResponseRevisions
+from models.search import ResponseSearchAll
+from models.status import ResponseStatus
+from models.upload import ResponseUpLoad
+from db.db import get_session
+from services.base import ServiceLink
+import services.authorization as auto
+from core.config import config_token
 
 router = APIRouter()
 

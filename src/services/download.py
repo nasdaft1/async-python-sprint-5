@@ -11,9 +11,9 @@ import sqlalchemy as sql
 from fastapi import status
 from fastapi.responses import StreamingResponse
 
-from src.db.models import Files, Paths
-from src.db.db import s3
-from src.services.util import check_path_file
+from db.models import Files, Paths
+from db.db import s3
+from services.util import check_path_file
 
 
 class Download:
@@ -85,7 +85,7 @@ class Download:
         return io.BytesIO(content)
 
     async def download(self, path_file: str,
-                       compression: str, id_user: UUID) -> StreamingResponse:
+                       compression: str, id_user: str) -> StreamingResponse:
         """Скачивание файла/файлов с хранилища """
         try:
             file_name, path = check_path_file(path_file=path_file)

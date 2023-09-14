@@ -1,6 +1,6 @@
 from logging import config as logging_config
 
-from src.core.config import config
+from core.config import config
 
 LOGGING = {
     'version': 1,
@@ -36,26 +36,25 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'stream': 'ext://sys.stdout',
         },
-        # 'file': {
-        #     'class': 'logging.FileHandler',
-        #     'filename': config.log_file,
-        #     'mode': 'w',
-        #     'level': config.log_level,
-        #     'encoding': "utf-8",
-        #     'formatter': 'verbose'
-        # },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': config.log_file,
+            'mode': 'w',
+            'level': config.log_level,
+            'encoding': "utf-8",
+            'formatter': 'verbose'
+        },
     },
     'loggers': {
         '': {
             'handlers': config.log_handlers,
             'level': config.log_level,
+            'formatter': 'verbose',
         },
         'uvicorn.error': {
-            'level': config.log_level,
         },
         'uvicorn.access': {
-            'handlers': ['access'],
-            'level': config.log_level,
+            'handlers': ['access', 'file'],
             'propagate': False,
         },
     },

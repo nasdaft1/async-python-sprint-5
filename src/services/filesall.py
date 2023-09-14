@@ -3,14 +3,14 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sql
 
-from src.db.models import Files, Paths, UUID
-from src.models.files import ResponseFiles, ResponseFilesOne
+from db.models import Files, Paths, UUID
+from models.files import ResponseFiles, ResponseFilesOne
 
 
 class FilesAll:
     session: AsyncSession
 
-    async def files(self, id_user: UUID) -> ResponseFiles:
+    async def files(self, id_user: str) -> ResponseFiles:
         """
         Выводит список файлов
         :param id_user: UUID создавший файлы

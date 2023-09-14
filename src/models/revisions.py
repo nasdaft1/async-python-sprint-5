@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import BaseModel
 
-from src.models.base import FileConfig
+from models.base import FileConfig
 
 
 class ResponseRevisionsOne(FileConfig):

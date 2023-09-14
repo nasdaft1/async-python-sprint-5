@@ -4,8 +4,8 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sql
 
-from src.db.models import Files, Paths
-from src.models.revisions import ResponseRevisions, ResponseRevisionsOne
+from db.models import Files, Paths
+from models.revisions import ResponseRevisions, ResponseRevisionsOne
 
 
 class Revisions:
@@ -13,7 +13,7 @@ class Revisions:
 
     async def revisions(self, path: str,
                         path_limit: int | None,
-                        id_user: UUID) -> ResponseRevisions:
+                        id_user: str) -> ResponseRevisions:
         """
         Вернуть информацию об изменениях файла по заданным параметрам.
         :param path: путь к файлам text | uuid

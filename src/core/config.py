@@ -4,21 +4,24 @@ from typing import List, Literal
 from pydantic import conint, constr
 from pydantic_settings import BaseSettings
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if BASE_DIR[-3:] == 'src':
-    BASE_DIR = BASE_DIR[:-3]  # для MIGRATIONS
+
+def path_config() -> str:
+    basa_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if basa_dir[-3:] == 'src':
+        basa_dir = basa_dir[:-3]  # для MIGRATIONS
+    logging.info(f'Путь прописан {basa_dir}')
+    return basa_dir
 
 
 class AppConfig(BaseSettings):
     app_title: str = "ShorterLinks API"
     app_host: str = '127.0.0.1'
     app_port: conint(ge=1, le=65535) = 8080
-    postgres_user: constr(min_length=3) = 'app'
-    postgres_password: constr(min_length=3) = '123qwe'
-    postgres_db: constr(min_length=2) = 'db'
-    postgres_host: str = '127.0.0.1'
-    postgres_port: conint(ge=1, le=65535) = 5433
+    app_prefix: str = 'api/v1'
     postgres_echo: bool = True
+    postgres_db_dns: str = 'postgresql+asyncpg://app:123qwe@127.0.0.1:5432/db_url'
+    postgres_db_dns_test: str = 'postgresql+asyncpg://root:root@127.0.0.1:5433/test'
+    test_dir: str = 'TEST\\'
 
     nginx_port: conint(ge=1, le=65535) = 80
 
@@ -26,11 +29,11 @@ class AppConfig(BaseSettings):
         'DEBUG', 'ERROR', 'WARNING',
         'CRITICAL', 'INFO', 'FATAL'] = 'INFO'
     log_file: str = 'log1.txt'
-    log_handlers: List[str] = ['console']
+    log_handlers: List[str] = ['console', 'file']
     log_format: str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
     class Config:
-        env_file = f'{BASE_DIR}.env'
+        env_file = f'{path_config()}.env'
         env_file_encoding = 'utf-8'
         #  все дополнительные переменные,
         #  которые не определены как поля в модели,
@@ -47,7 +50,21 @@ class StorageConfig(BaseSettings):
     region: str = None
 
     class Config:
-        env_file = f'{BASE_DIR}src\\.env'
+        env_file = f'{path_config()}.env'
+        env_file_encoding = 'utf-8'
+        extra = 'allow'
+
+
+class TestStorageConfig(BaseSettings):
+    t_service_name: str = None
+    t_endpoint_url: str
+    t_aws_access_key_id: str
+    t_aws_secret_access_key: str
+    t_bucket_name: str
+    t_region: str = None
+
+    class Config:
+        env_file = f'{path_config()}.env'
         env_file_encoding = 'utf-8'
         extra = 'allow'
 
@@ -60,13 +77,14 @@ class Crypt(BaseSettings):
     cookie_max_age: int = 1800  # секунды
 
     class Config:
-        env_file = f'{BASE_DIR}src\\.crypt_env'
+        env_file = f'{path_config()}.env'
         env_file_encoding = 'utf-8'
         extra = 'allow'
 
 
 config = AppConfig()
 config_storage = StorageConfig()
+t_config_storage = TestStorageConfig()
 config_token = Crypt()
 
 logging.debug(f'Read configuration {config}')

@@ -6,40 +6,26 @@ import string
 
 import pytest
 from httpx import AsyncClient
-from fastapi.testclient import TestClient
 import sqlalchemy as sql
 
-from src.main import app
-from src.db.models import Access, Files, Paths
-from src.db import db
-from src.services.util import check_path_file
-from src.core.config import config_token
-from src.db.db import s3, db_config
-from src.db.models import Base
-from src.services.upload import UpLoad
+import db.db
+from fastapi.testclient import TestClient
+from conftest import async_session as t_async_session
+from main import app
+from db.models import Access, Files, Paths
+from services.util import check_path_file
+from core.config import config_token
+from db.db import s3, get_session
+from core.config import config
 
-client = TestClient(app)
-
-dns = db.db_config.replace('+asyncpg', '')
-engine = sql.create_engine(dns)
-Session = db.async_session
+from db.db import async_session
 
 user: UUID
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-html_url = 'http://127.0.0.1:8080/api/v1'
+base_url = f'http://{config.app_host}:{config.app_port}/{config.app_prefix}'
+
 token = {'Test': ''}
 id_key = {'1': '1'}
-
-
-# # Подключение к серверу PostgreSQL
-# engine = async sql.create_engine(db_config.replace('+asyncpg', ''))
-# # Base.metadata.create_all(engine)
-# Base.metadata.clear(engine)
-
-async def test_create_db():
-    async with db.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
 
 
 @pytest.mark.parametrize('name_input, expected',
@@ -54,6 +40,7 @@ async def test_create_db():
                           ('/', [None, '/']),
                           ])
 def test_util__check_path_file(name_input: str, expected: list):
+    result1, reselt2 = None, None
     try:
         result1, reselt2 = check_path_file(name_input)
     except ValueError as error:
@@ -63,45 +50,67 @@ def test_util__check_path_file(name_input: str, expected: list):
     assert [result1, reselt2] == expected
 
 
-# async def test_create_file_db():
-#     UpLoad.file_create(
-#         file_name='58952b95-55dc-4e61-9707-c19022dde5cc',
-#         id_path='',
-#         id_user=22,
-#         file_hash='',
-#         file_size='',
-#         file_uuid='')
-#     async with Session() as session:
-#         statement = sql.select(Files.account_id, Files.file_name)
-#         data = (await session.execute(statement)).fetchall()
-#         assert len(data)
+async def connect_db():
+    async with async_session() as session:
+        """Проверка что в БД данные вносятся"""
+        statement = sql.select(sql.func.count(Access.id))
+        count_as = (await session.execute(statement)).fetchone()
+        statement = sql.select(sql.func.count(Files.id_file))
+        count_fi = (await session.execute(statement)).fetchone()
+        statement = sql.select(sql.func.count(Paths.id_path))
+        count_pa = (await session.execute(statement)).fetchone()
+        logging.error(f'Количество данные в таблицах as={count_as[0]} fi={count_fi[0]} pa={count_pa[0]} ')
+    async with t_async_session() as session:
+        """Проверка что в БД данные вносятся"""
+        statement = sql.select(sql.func.count(Access.id))
+        count_as = (await session.execute(statement)).fetchone()
+        statement = sql.select(sql.func.count(Files.id_file))
+        count_fi = (await session.execute(statement)).fetchone()
+        statement = sql.select(sql.func.count(Paths.id_path))
+        count_pa = (await session.execute(statement)).fetchone()
+        logging.error(f'Количество данные в таблицах as={count_as[0]} fi={count_fi[0]} pa={count_pa[0]} ')
 
-@pytest.mark.asyncio
+
+async def test_star_db():
+    await connect_db()
+
+
 async def test_in():
-    async with AsyncClient(app=app, base_url='http://127.0.0.1:8080/api/v1') as ac:
+    async with AsyncClient(app=app, base_url=base_url) as ac:
         response = await ac.get('/')
         print(response)
         assert response.status_code == 200
         assert response.text == '"Добро пожаловать в Файловое хранилище"'
 
 
-@pytest.mark.asyncio
-async def test_register():
-    async with AsyncClient(app=app, base_url='http://127.0.0.1:8080/api/v1') as ac:
+async def test_ping():
+    async with AsyncClient(app=app, base_url=base_url) as ac:
         response = await ac.get('/ping')
+        print(response)
         assert response.status_code == 200
+        assert response.json().get('db') is not None
+        assert response.json().get('cache') is None
+        assert response.json().get('nginx') is not None
+        assert response.json().get('storage') is not None
 
 
 @pytest.mark.parametrize('username, password, code, res_text',
                          [('ggH4e3/1', 'ggH4e3/1', 200, True),
+                          ('1вH45e3/1', '35.2dJwы', 200, True),
+                          ('ggH46e3/1', 'ggH4e3/1', 200, True),
+                          ('1вH47e3/1', '35.2dJwы', 200, True),
+                          ('ggH4e83/1', 'ggH4e3/1', 200, True),
+                          ('1вHgf3e3/1', '35.2dJwы', 200, True),
+                          ('ggH4e93/1', 'ggH4e3/1', 200, True),
                           ('1вH4e3/1', '35.2dJwы', 200, True),
                           ('1вH4e3/1', '3wы', 422, False),
                           ('1вH4e3/1', '3w423fsdfы', 200, False)])
 async def test_register(username, password, code, res_text):
     """Проверка регистрации пользователей и ошибок"""
-    async with AsyncClient(app=app, base_url='http://127.0.0.1:8080/api/v1') as ac:
+    async with AsyncClient(app=app, base_url=base_url) as ac:
         params = {'username': username, 'password': password}
         response = await ac.post('/register', params=params)
+
         assert response.status_code == code
         if res_text:
             assert response.text == '{"msg":"Пользователь зарегистрирован"}'
@@ -114,7 +123,7 @@ async def test_register(username, password, code, res_text):
                           ('1вH4e3/1', '35.2dJwы')])
 async def test_get_user(username, password):
     """Проверка что в БД данные вносятся"""
-    async with Session() as session:
+    async with async_session() as session:
         statement = sql.select(Access.id).where(Access.user == username)
         global user
         user = (await session.execute(statement)).one_or_none()
@@ -132,7 +141,7 @@ async def test_get_user(username, password):
                           ('1вH4e3/1', '35.2dJwы')])
 async def test_auth(username, password):
     """Авторизация и получение токенов и их корректность"""
-    async with AsyncClient(app=app, base_url='http://127.0.0.1:8080/api/v1') as ac:
+    async with AsyncClient(app=app, base_url=base_url) as ac:
         params = {'username': username, 'password': password}
         response = await ac.post("/auth", params=params)
         global token
@@ -146,7 +155,9 @@ async def test_auth(username, password):
     assert token[key[0]] != token[key[1]]
 
 
-# assert token[key[0]] != token[key[1]] # не генерятся ли одинаковые
+def test_token():
+    assert len(token) == 3
+
 
 async def generated_file(file_name: str, path_test, length: int = 1024):
     """Генерация данных для файла"""
@@ -172,11 +183,11 @@ async def storages():
 async def test_update(username, password, path, size, file_name, file_new):
     """Запись файла в облачное хранилище"""
     count_file_storages_start = await storages()
-    async with AsyncClient(app=app, base_url=html_url) as ac:
+    async with AsyncClient(app=app, base_url=base_url) as ac:
         # Создание cookies
         ac.cookies.set(name=config_token.token_name, value=token[username])
         # Создание временных файлов
-        path_test = 'TEST\\'
+        path_test = config.test_dir
         await generated_file(file_name, path_test, size)
 
         params = {'path': path}
@@ -204,7 +215,7 @@ async def test_update(username, password, path, size, file_name, file_new):
 @pytest.mark.asyncio
 async def test_storage(username, password, path, size, file_name, file_new):
     """Проверка наличия в облачном хранилище файлов"""
-    async with Session() as session:
+    async with async_session() as session:
         statement = (sql.select(Access.user, Files.file_name,
                                 Files.unique_id, Files.file_name, Files.hash, Files.size
                                 ).join(Access).join(Paths).where(sql.and_(
@@ -229,7 +240,7 @@ async def test_storage(username, password, path, size, file_name, file_new):
                           ('ggH4e3/1', '/1/1.txt', 'zip', '3.zip', 1000),  # проверка скачивания одного файла в папке
                           ])
 async def test_files_download(username, path_file, compression, file_test, file_size):
-    async with AsyncClient(app=app, base_url=html_url) as ac:
+    async with AsyncClient(app=app, base_url=base_url) as ac:
         # Создание cookies
         ac.cookies.set(name=config_token.token_name, value=token[username])
 
@@ -264,7 +275,7 @@ async def test_files_download(username, path_file, compression, file_test, file_
      ('1вH4e3/1', {'/1/': {'allocated': '4100', 'files': 1, 'used': '2100', },
                    '/2/': {'allocated': '3000', 'files': 2, 'used': '3000'}})])
 async def test_user_status(username, data):
-    async with AsyncClient(app=app, base_url=html_url) as ac:
+    async with AsyncClient(app=app, base_url=base_url) as ac:
         # Создание cookies
         ac.cookies.set(name=config_token.token_name, value=token[username])
 
@@ -284,7 +295,7 @@ async def test_user_status(username, data):
                           ('1вH4e3/1', 'created_at', '/2/', 1000, '4.txt', 1),
                           ])  # переписываем старый
 async def test_files_search(username, order_by, path, size, file_name, limit):
-    async with AsyncClient(app=app, base_url=html_url) as ac:
+    async with AsyncClient(app=app, base_url=base_url) as ac:
         # Создание cookies
         ac.cookies.set(name=config_token.token_name, value=token[username])
 
@@ -310,7 +321,7 @@ async def test_files_search(username, order_by, path, size, file_name, limit):
                           ('1вH4e3/1', '35.2dJwы', '/2/', 1000, '4.txt', 1),
                           ])  # переписываем старый
 async def test_files_revisions(username, password, path, size, file_name, limit):
-    async with AsyncClient(app=app, base_url=html_url) as ac:
+    async with AsyncClient(app=app, base_url=base_url) as ac:
         # Создание cookies
         ac.cookies.set(name=config_token.token_name, value=token[username])
         params = {'path': path, 'limit': limit}
@@ -330,7 +341,7 @@ async def test_files_revisions(username, password, path, size, file_name, limit)
                          [('ggH4e3/1', 1),
                           ('1вH4e3/1', 3)])
 async def test_files(username, long):
-    async with AsyncClient(app=app, base_url=html_url) as ac:
+    async with AsyncClient(app=app, base_url=base_url) as ac:
         # Создание cookies
         ac.cookies.set(name=config_token.token_name, value=token[username])
         response = await ac.get("/files/")
@@ -341,22 +352,5 @@ async def test_files(username, long):
         assert str(response.json().get('account_id')) == id_key[username]
 
 
-async def test_viev_db():
-    async with Session() as session:
-        statement = sql.select(Files.account_id, Files.file_name,
-                               Files.unique_id, Paths.path, Paths.id_path, Files.size).join(Paths)
-
-        data = (await session.execute(statement)).fetchall()
-        for line in data:
-            logging.error(f'+++++{line}')
-
-# if __name__ == "__main__":
-#     asyncio.run(test_register())
-# asyncio.run(test_auth())
-# id_user = ''
-# asyncio.run(test_update(id_user))
-# asyncio.run(test_files_download(id_user))
-# asyncio.run(test_user_status(id_user))
-# asyncio.run(test_files_search(id_user))
-# asyncio.run(test_files_revisions(id_user))
-# asyncio.run(test_files(id_user))
+async def test_end_db():
+    await connect_db()

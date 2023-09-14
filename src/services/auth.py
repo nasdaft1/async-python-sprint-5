@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sql
 
-from src.db.models import Access
+from db.models import Access
 
 
 class Auth:

@@ -4,14 +4,14 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sql
 
-from src.db.models import Files, Paths
-from src.models.search import ResponseSearch, ResponseSearchAll
+from db.models import Files, Paths
+from models.search import ResponseSearch, ResponseSearchAll
 
 
 class Search:
     session: AsyncSession
 
-    async def search(self, id_user: UUID,
+    async def search(self, id_user: str,
                      path: str | None,
                      extension: str | None,
                      order_by: str | None,

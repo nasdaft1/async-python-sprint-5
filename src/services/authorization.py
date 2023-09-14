@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException, status, Request
 from jose import JWTError, jwt
 
-from src.core.config import config_token
+from core.config import config_token
 
 
 def create_access_token(username: str, uuid_id: UUID | None):
@@ -25,8 +25,8 @@ def create_access_token(username: str, uuid_id: UUID | None):
     return encoded_jwt
 
 
-async def get_current_user(request: Request) -> UUID | None:
-    token = request.cookies.get('X-Bearer_token')
+async def get_current_user(request: Request) -> str | None:
+    token = request.cookies.get(config_token.token_name)
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -39,7 +39,7 @@ async def get_current_user(request: Request) -> UUID | None:
         is_valid = jwt.decode(token, config_token.secret_key,
                               algorithms=[config_token.algorithm],
                               options={"verify_signature": False})
-        token_scopes = UUID(payload.get("scopes", None))
+        token_scopes = str(payload.get("scopes", None))
         if token_scopes is None:
             raise credentials_exception
     except JWTError as error:

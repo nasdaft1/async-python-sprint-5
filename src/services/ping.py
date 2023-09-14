@@ -6,10 +6,10 @@ import aiohttp
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sql
 
-from src.models.ping import ResponsePing
-from src.db.models import Access
-from src.db.db import s3
-from src.core.config import config
+from models.ping import ResponsePing
+from db.models import Access
+from db.db import s3
+from core.config import config
 
 
 def timing_decorator(func):

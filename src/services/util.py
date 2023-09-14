@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.db.models import UniqueUUID
+from db.models import UniqueUUID
 
 session: AsyncSession
 
@@ -40,13 +40,13 @@ def check_path_file(path_file: str) -> [str | None, str | None]:
     return file, path
 
 
-async def add_id(session: AsyncSession, attempt: int = 1) -> UUID:
+async def add_id(session: AsyncSession, attempt: int = 1) -> str:
     """Для получения уникального ключа"""
     # Создаем запись в БД с каталогом
     index = 0
     while True:
 
-        key = uuid.uuid4()
+        key = str(uuid.uuid4())
         obj = UniqueUUID(id=key)
 
         try:

@@ -18,4 +18,4 @@ COPY . .
 #WORKDIR /app/src # root проекта папка src 
 WORKDIR src
 # CMD gunicorn main:app --bind 0.0.0.0:8000 --worker-class aiohttp.GunicornWebWorker
-CMD gunicorn main:app --bind 0.0.0.0:8000
+CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "main:app"]
